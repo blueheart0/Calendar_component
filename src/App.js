@@ -1,24 +1,49 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import moment from "moment";
+import React, { useState } from "react";
+import { CCCalendar } from "./Component/CCCalendar";
+
+const events = [
+  {
+    start: moment().clone(),
+    end: moment()
+      .clone()
+      .add(30, "minute"),
+    data: {
+      title: "TestEvent-1",
+      id: "1"
+    }
+  },
+  {
+    start: moment()
+      .clone()
+      .add(30, "minute"),
+    end: moment()
+      .clone()
+      .add(60, "minute"),
+    data: {
+      title: "TestEvent-2",
+      id: "2"
+    }
+  }
+];
 
 function App() {
+  const [eventsArr, setEventArr] = useState(events);
+  // console.log(eventsArr);
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="App" style={{ height: "80vh" }}>
+      <CCCalendar
+        date={moment()}
+        events={eventsArr}
+        onEventDrop={e => {
+          // let _temp = JSON.parse(JSON.stringify(eventsArr));
+          let _temp = [...eventsArr];
+          _temp[_temp.findIndex(item => item.data.id === e.data.id)] = e;
+
+          // console.log(_temp);
+          setEventArr(_temp);
+        }}
+      />
     </div>
   );
 }
