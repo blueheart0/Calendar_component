@@ -43,7 +43,7 @@ const getMaxFriends = (event, maxFriends = 0, visited = []) => {
 };
 const getEvent = function*(events, slotHeight, step, onEventDrop) {
   for (let i = 0; i < events.length; i++) {
-    console.log(events[i].data.title, events[i].friends);
+    // console.log(events[i].data.title, events[i].friends);
     yield (
       <EventItem
         key={"Event_" + events[i].data.id + events[i].start.toString()}
