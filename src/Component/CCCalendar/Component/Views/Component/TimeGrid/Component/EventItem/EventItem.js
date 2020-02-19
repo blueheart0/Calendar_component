@@ -1,45 +1,66 @@
+import Grid from "@material-ui/core/Grid";
 import { makeStyles } from "@material-ui/core/styles";
 import clsx from "clsx";
 import moment from "moment";
 import React, { useEffect, useRef, useState } from "react";
 
-const useStyle = makeStyles(theme => ({
-  root: {
-    position: "absolute",
-    width: props => `${100 / (props.maxFriends + 1)}%`,
-    height: props => `${props.height}%`,
-    backgroundColor: props => props.backgroundColor,
-    color: "#000000",
-    border: "1px solid #000000",
-    overflow: "hidden",
-    top: props => `${props.top}%`,
-    boxSizing: "border-box",
-    userSelect: "none",
-    cursor: "pointer",
-    zIndex: props => props.friendsIndex,
-    left: props => {
-      if (props.maxFriends > 0) {
-        if (props.friendsIndex > 0) {
-          return `${(100 / (props.maxFriends + 1)) * props.friendsIndex -
-            (100 / (props.maxFriends + 1)) * 0.2}%`;
+const useStyle = makeStyles(
+  theme => ({
+    root: {
+      position: "absolute",
+      width: props => `${100 / (props.maxFriends + 1)}%`,
+      height: props => `${props.height}%`,
+      backgroundColor: props => props.backgroundColor,
+      color: "#000000",
+      border: "1px solid #000000",
+      overflow: "hidden",
+      top: props => `${props.top}%`,
+      boxSizing: "border-box",
+      userSelect: "none",
+      cursor: "pointer",
+      zIndex: props => props.friendsIndex,
+      left: props => {
+        if (props.maxFriends > 0) {
+          if (props.friendsIndex > 0) {
+            return `${(100 / (props.maxFriends + 1)) * props.friendsIndex -
+              (100 / (props.maxFriends + 1)) * 0.2}%`;
+          } else {
+            return `${(100 / (props.maxFriends + 1)) * props.friendsIndex}%`;
+          }
         } else {
-          return `${(100 / (props.maxFriends + 1)) * props.friendsIndex}%`;
+          return `0%`;
         }
-      } else {
-        return `0%`;
       }
+    },
+    is__dragging: {
+      // width: 0,
+      // height: 0
+    },
+    event__item: {
+      position: "relative"
+    },
+    resize__handle: {
+      position: "absolute",
+      backgroundColor: "red"
+    },
+    resize__handle__top: {
+      top: 5,
+      left: "50%",
+      transform: "translateX(-50%)"
+    },
+    resize__handle__bottom: {
+      bottom: 5,
+      left: "50%",
+      transform: "translateX(-50%)"
     }
-  },
-  is__dragging: {
-    // width: 0,
-    // height: 0
-  }
-}));
+  }),
+  { name: "EventItem" }
+);
 
 const EventItem = props => {
   const { event, slotHeight, step, id, onEventDrop, maxFriends } = props;
   const [isDragging, setIsDragging] = useState(false);
-  const [dragPos, setDragPos] = useState([0, 0]);
+  const [isResizing, setIsResizing] = useState(false);
   const eventItemRef = useRef();
   const [eventSize, setEventSize] = useState({
     maxFriends: 0,
@@ -81,105 +102,146 @@ const EventItem = props => {
   // console.log(event.data.id, event.start.toString());
 
   return (
-    <>
-      <div
-        id={id}
-        draggable={true}
-        ref={eventItemRef}
-        data-start={event.start.toString()}
-        data-end={event.end.toString()}
-        onDrop={ev => {
-          // console.log("EventItem-onDrop", ev);
-          ev.preventDefault();
-          ev.stopPropagation();
-          ev.nativeEvent.stopImmediatePropagation();
+    <Grid
+      item
+      container
+      id={id}
+      draggable={!isResizing}
+      ref={eventItemRef}
+      data-start={event.start.toString()}
+      data-end={event.end.toString()}
+      onDrop={ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        ev.nativeEvent.stopImmediatePropagation();
 
-          let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
-          console.log(data);
-          data = {
-            ...data,
-            start: moment(data.start, "X"),
-            end: moment(data.end, "X")
-          };
-          let _dropStart = event.start
-            .clone()
-            .startOf("day")
-            .add(
-              24 *
-                60 *
-                ((ev.currentTarget.offsetTop +
-                  ev.nativeEvent.offsetY -
-                  data.y) /
-                  ev.currentTarget.offsetParent.scrollHeight),
-              "minutes"
-            )
-            .subtract(
-              (24 *
-                60 *
-                ((ev.currentTarget.offsetTop +
-                  ev.nativeEvent.offsetY -
-                  data.y) /
-                  ev.currentTarget.offsetParent.scrollHeight)) %
-                step,
-              "minutes"
-            );
-          // console.log(event.start.toISOString());
-          // console.log(_dropStart.toISOString());
-          // _dropStart = _dropStart.isSame(event.start) ? event.start : _dropStart;
-
-          onEventDrop({
-            start: _dropStart,
-            end: _dropStart
-              .clone()
-              .add(moment.duration(data.end.diff(data.start))),
-            resourceId: null,
-            droppedOnAllDaySlot: false,
-            data: data.data
-          });
-          setIsDragging(false);
-        }}
-        onDragStart={ev => {
-          console.log("DragStart", ev);
-          ev.stopPropagation();
-          ev.nativeEvent.stopImmediatePropagation();
-          ev.dataTransfer.dropEffect = "move";
-          ev.dataTransfer.effectAllowed = "move";
-          ev.dataTransfer.setDragImage(
-            eventItemRef.current,
-            ev.nativeEvent.offsetX,
-            ev.nativeEvent.offsetY
-          ); //TODO:Element를 지정할수 있어서 데이터로 따로 엘리먼트 만들어 넣으면 된다, ref를 넣어야 함
-          console.log("onDragStart", event);
-          delete event.friends;
-          ev.dataTransfer.setData(
-            "text/plain",
-            JSON.stringify({
-              ...event,
-              start: event.start.unix(),
-              end: event.end.unix(),
-              x: ev.nativeEvent.offsetX,
-              y: ev.nativeEvent.offsetY
-            })
+        let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
+        console.log(data);
+        data = {
+          ...data,
+          start: moment(data.start, "X"),
+          end: moment(data.end, "X")
+        };
+        let _dropStart = event.start
+          .clone()
+          .startOf("day")
+          .add(
+            24 *
+              60 *
+              ((ev.currentTarget.offsetTop + ev.nativeEvent.offsetY - data.y) /
+                ev.currentTarget.offsetParent.scrollHeight),
+            "minutes"
+          )
+          .subtract(
+            (24 *
+              60 *
+              ((ev.currentTarget.offsetTop + ev.nativeEvent.offsetY - data.y) /
+                ev.currentTarget.offsetParent.scrollHeight)) %
+              step,
+            "minutes"
           );
-          setIsDragging(true);
-        }}
-        className={clsx(classes.root, { [classes.is__dragging]: isDragging })}
-        onDragOver={ev => {
-          ev.preventDefault();
-          ev.dataTransfer.dropEffect = "move";
-          // setIsHover(true);
-          // ev.nativeEvent.offsetY =
-          //   ev.nativeEvent.offsetY - (ev.nativeEvent.offsetY % step);
-        }}
-        onDragEnd={e => {
-          e.preventDefault();
-          console.log("onDragEnd", e);
-          setIsDragging(false);
-        }}
-      >
+        onEventDrop({
+          start: _dropStart,
+          end: _dropStart
+            .clone()
+            .add(moment.duration(data.end.diff(data.start))),
+          resourceId: null,
+          droppedOnAllDaySlot: false,
+          data: data.data
+        });
+        setIsDragging(false);
+      }}
+      onDragStart={ev => {
+        console.log("DragStart", ev);
+        ev.stopPropagation();
+        ev.nativeEvent.stopImmediatePropagation();
+        ev.dataTransfer.dropEffect = "move";
+        ev.dataTransfer.effectAllowed = "move";
+        ev.dataTransfer.setDragImage(
+          eventItemRef.current,
+          ev.nativeEvent.offsetX,
+          ev.nativeEvent.offsetY
+        ); //TODO:Element를 지정할수 있어서 데이터로 따로 엘리먼트 만들어 넣으면 된다, ref를 넣어야 함
+        console.log("onDragStart", event);
+        delete event.friends;
+        ev.dataTransfer.setData(
+          "text/plain",
+          JSON.stringify({
+            ...event,
+            start: event.start.unix(),
+            end: event.end.unix(),
+            x: ev.nativeEvent.offsetX,
+            y: ev.nativeEvent.offsetY
+          })
+        );
+        setIsDragging(true);
+      }}
+      className={clsx(classes.root, { [classes.is__dragging]: isDragging })}
+      onDragOver={ev => {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = "move";
+      }}
+      onDragEnd={e => {
+        e.preventDefault();
+        // console.log("onDragEnd", e);
+        setIsDragging(false);
+      }}
+    >
+      <Grid className={clsx(classes.event__item)} item container>
+        <Grid
+          onMouseDown={e => {
+            e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
+            setIsResizing(true);
+            console.log("onMouseDown", e);
+          }}
+          onMouseUp={e => {
+            e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
+            setIsResizing(false);
+            console.log("onMouseUp", e);
+          }}
+          onMouseLeave={e => {
+            e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
+            setIsResizing(false);
+            console.log("onMouseLeave", e);
+          }}
+          item
+          className={clsx(classes.resize__handle, classes.resize__handle__top)}
+        >
+          Handle
+        </Grid>
         {event.data.title}
-      </div>
-    </>
+        <Grid
+          onMouseDown={e => {
+            e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
+            setIsResizing(true);
+            console.log("onMouseDown", e);
+          }}
+          onMouseUp={e => {
+            e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
+            setIsResizing(false);
+            console.log("onMouseUp", e);
+          }}
+          onMouseLeave={e => {
+            e.stopPropagation();
+            e.nativeEvent.stopImmediatePropagation();
+            setIsResizing(false);
+            console.log("onMouseLeave", e);
+          }}
+          item
+          className={clsx(
+            classes.resize__handle,
+            classes.resize__handle__bottom
+          )}
+        >
+          Handle
+        </Grid>
+      </Grid>
+    </Grid>
   );
 };
 export default EventItem;
