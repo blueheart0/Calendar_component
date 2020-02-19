@@ -5,10 +5,11 @@ import React from "react";
 
 const useStyle = makeStyles(theme => ({
   root: {
-    width: props =>
-      `calc((100% - ${props.gutterWidth}px - ${
-        props.needScrollGutter ? props.scrollGutterWidth : 0
-      }px) / 7)`,
+    // width: props =>
+    //   `calc((100% - ${props.gutterWidth}px - ${
+    //     props.needScrollGutter ? props.scrollGutterWidth : 0
+    //   }px) / 7)`,
+    width: `${100 / 7}%`,
     height: props => props.headerHeight,
     backgroundColor: "#fff",
     borderTop: "1px solid #b8bec5",

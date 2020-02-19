@@ -21,7 +21,8 @@ const useStyle = makeStyles(
     slot__header: {},
     gutter__header: {
       width: gutter_width,
-      height: slot_height,
+      minWidth: gutter_width,
+      // height: slot_height,
       backgroundColor: "#fff",
       borderTop: "1px solid #b8bec5",
       borderBottom: "1px solid #b8bec5",
@@ -36,18 +37,42 @@ const useStyle = makeStyles(
     },
     time_content: {
       overflowY: "auto",
-      height: `calc(100% - ${header_height}px)`,
+      height: props => `calc(100% - ${props.headerContainerHeight}px)`,
       borderBottom: "1px solid #b8bec5"
     },
     scroll__gutter: {
       minWidth: scroll_gutter_width,
       width: scroll_gutter_width,
-      height: slot_height,
+      // height: slot_height,
       border: "1px solid #b8bec5"
     }
   }),
   { name: "TimeGrid" }
 );
+
+const getAllDaySlot = function*(
+  { start, end },
+  headerHeight,
+  needScrollGutter,
+  scrollGutterWidth
+) {
+  let _day = start.clone();
+  do {
+    yield (
+      <Grid
+        key={"AllDay_" + _day.toISOString()}
+        item
+        style={{
+          width: `${100 / 7}%`,
+          height: slot_height,
+          backgroundColor: "red"
+        }}
+      />
+    );
+    _day.add(1, "day");
+  } while (_day.isSameOrBefore(end));
+};
+
 const getTimeGutter = function*(step = 15, slotHeight) {
   let _start = moment().startOf("day");
   let _end = moment().endOf("day");
@@ -117,9 +142,15 @@ const getTimeGroup = function*(
 const TimeGrid = props => {
   const { range, onEventDrop, events, ...others } = props;
   const [needScrollGutter, setNeedScrollGutter] = useState(false);
-  const classes = useStyle();
+
   const timeContentRef = useRef();
+  const [headerContainerHeight, setHeaderContainerHeight] = useState(
+    slot_height + header_height
+  );
+  const headerRef = useRef();
+  const classes = useStyle({ headerContainerHeight: headerContainerHeight });
   const timeContentResizeObserver = new ResizeObserver(entries => {
+    // console.log(entries);
     if (entries && entries[0] && entries[0].target) {
       if (entries[0].contentRect.height < entries[0].target.scrollHeight) {
         if (!needScrollGutter) setNeedScrollGutter(true);
@@ -128,8 +159,19 @@ const TimeGrid = props => {
       }
     }
   });
+  const headerResizeObserver = new ResizeObserver(entries => {
+    if (entries && entries[0] && entries[0].target) {
+      if (
+        entries[0].contentRect.height !==
+        headerContainerHeight - header_height
+      ) {
+        setHeaderContainerHeight(header_height + entries[0].contentRect.height);
+      }
+    }
+  });
   useEffect(() => {
     timeContentResizeObserver.observe(timeContentRef.current);
+    headerResizeObserver.observe(headerRef.current);
   }, [timeContentRef, timeContentResizeObserver]);
 
   // console.log(onEventDrop);
@@ -144,14 +186,37 @@ const TimeGrid = props => {
           wrap={"nowrap"}
         >
           <Grid item className={classes.gutter__header} />
-          {[
-            ...getWeekHeader(
-              range,
-              header_height,
-              needScrollGutter,
-              scroll_gutter_width
-            )
-          ]}
+          <Grid
+            item
+            container
+            style={{
+              width: `calc(100% - ${props.gutterWidth}px - ${
+                props.needScrollGutter ? props.scrollGutterWidth : 0
+              }px) `
+            }}
+            direction={"column"}
+          >
+            <Grid item container>
+              {[
+                ...getWeekHeader(
+                  range,
+                  header_height,
+                  needScrollGutter,
+                  scroll_gutter_width
+                )
+              ]}
+            </Grid>
+            <Grid item container ref={headerRef}>
+              {[
+                ...getAllDaySlot(
+                  range,
+                  header_height,
+                  needScrollGutter,
+                  scroll_gutter_width
+                )
+              ]}
+            </Grid>
+          </Grid>
           {needScrollGutter && <Grid item className={classes.scroll__gutter} />}
         </Grid>
         <Grid
