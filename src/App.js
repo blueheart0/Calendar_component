@@ -2,30 +2,23 @@ import moment from "moment";
 import React, { useState } from "react";
 import { CCCalendar } from "./Component/CCCalendar";
 
-const events = [
-  {
-    start: moment().clone(),
-    end: moment()
-      .clone()
-      .add(30, "minute"),
-    data: {
-      title: "TestEvent-1",
-      id: "1"
-    }
-  },
-  {
-    start: moment()
-      .clone()
-      .add(30, "minute"),
-    end: moment()
-      .clone()
-      .add(60, "minute"),
-    data: {
-      title: "TestEvent-2",
-      id: "2"
-    }
+const makeData = function*() {
+  for (let i = 0; i < 100; i++) {
+    let current = moment().add(24 * Math.random(), "hour");
+    // let current = moment().add(i, "hour");
+    yield {
+      start: current.clone(),
+      end: current.clone().add(30, "minute"),
+      data: {
+        title: `TestEvent-${i}`,
+        // id: uuid.v4()
+        id: i
+      }
+    };
   }
-];
+};
+
+const events = [...makeData()];
 
 function App() {
   const [eventsArr, setEventArr] = useState(events);

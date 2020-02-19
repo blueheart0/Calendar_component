@@ -1,50 +1,74 @@
 import { makeStyles } from "@material-ui/core/styles";
 import clsx from "clsx";
 import moment from "moment";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const useStyle = makeStyles(theme => ({
   root: {
     position: "absolute",
-    width: "100%",
+    width: props => `${100 / (props.maxFriends + 1)}%`,
     height: props => `${props.height}%`,
     backgroundColor: props => props.backgroundColor,
-    color: "#ffffff",
+    color: "#000000",
+    border: "1px solid #000000",
+    overflow: "hidden",
     top: props => `${props.top}%`,
+    boxSizing: "border-box",
     userSelect: "none",
-    cursor: "pointer"
+    cursor: "pointer",
+    zIndex: props => props.friendsIndex,
+    left: props => {
+      if (props.maxFriends > 0) {
+        if (props.friendsIndex > 0) {
+          return `${(100 / (props.maxFriends + 1)) * props.friendsIndex -
+            (100 / (props.maxFriends + 1)) * 0.2}%`;
+        } else {
+          return `${(100 / (props.maxFriends + 1)) * props.friendsIndex}%`;
+        }
+      } else {
+        return `0%`;
+      }
+    }
   },
   is__dragging: {
     // width: 0,
     // height: 0
   }
 }));
+
 const EventItem = props => {
-  const { event, slotHeight, step, id, onEventDrop } = props;
+  const { event, slotHeight, step, id, onEventDrop, maxFriends } = props;
   const [isDragging, setIsDragging] = useState(false);
   const [dragPos, setDragPos] = useState([0, 0]);
   const eventItemRef = useRef();
-  // console.log(event.start.minute());
-  const eventSize = useMemo(() => {
+  const [eventSize, setEventSize] = useState({
+    maxFriends: 0,
+    top: 0,
+    bottom: 0
+  });
+  // console.log(event);
+  useEffect(() => {
     if (event && event?.start && event?.end && step && slotHeight) {
+      // console.log("MaxFriends", getMaxFriends(event));
       let topMinutes = event.start.hour() * 60 + event.start.minute();
       let bottomMinutes = event.end.hour() * 60 + event.end.minute();
-      return {
-        // top: (topMinutes / step) * slotHeight,
+      setEventSize({
+        maxFriends: maxFriends,
         top: (topMinutes / (24 * 60)) * 100,
-        height: (bottomMinutes / (24 * 60) - topMinutes / (24 * 60)) * 100
-      };
+        height: (bottomMinutes / (24 * 60) - topMinutes / (24 * 60)) * 100,
+        friendsIndex: event.friendsIndex ? event.friendsIndex : 0
+      });
     } else {
-      return { top: 0, bottom: 0 };
+      setEventSize({ maxFriends: 0, top: 0, bottom: 0 });
     }
-  }, [event, slotHeight, step]);
+  }, [event, slotHeight, step, maxFriends]);
   const [backgroundColor, setBackgroundColor] = useState(
     // () => "#" + Math.floor(Math.random() * 16777215).toString(16)
-    "#050505"
+    "#ffffff"
   );
   useEffect(() => {
     if (eventItemRef.current) {
-      console.log(eventItemRef);
+      // console.log(eventItemRef);
       eventItemRef.current.hidden = isDragging;
     }
   }, [isDragging]);
@@ -62,8 +86,10 @@ const EventItem = props => {
         id={id}
         draggable={true}
         ref={eventItemRef}
+        data-start={event.start.toString()}
+        data-end={event.end.toString()}
         onDrop={ev => {
-          console.log("EventItem-onDrop", ev);
+          // console.log("EventItem-onDrop", ev);
           ev.preventDefault();
           ev.stopPropagation();
           ev.nativeEvent.stopImmediatePropagation();
@@ -124,6 +150,7 @@ const EventItem = props => {
             ev.nativeEvent.offsetY
           ); //TODO:Element를 지정할수 있어서 데이터로 따로 엘리먼트 만들어 넣으면 된다, ref를 넣어야 함
           console.log("onDragStart", event);
+          delete event.friends;
           ev.dataTransfer.setData(
             "text/plain",
             JSON.stringify({
