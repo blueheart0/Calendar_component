@@ -36,6 +36,15 @@ function App() {
           // console.log(_temp);
           setEventArr(_temp);
         }}
+        onEventResize={e => {
+          let _temp = [...eventsArr];
+          console.log(e.event);
+          _temp[_temp.findIndex(item => item.data.id === e.event.data.id)] =
+            e.event;
+          console.log(e.event);
+          // console.log(_temp);
+          setEventArr(_temp);
+        }}
       />
     </div>
   );

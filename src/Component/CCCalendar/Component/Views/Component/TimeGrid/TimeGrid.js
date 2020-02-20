@@ -118,7 +118,8 @@ const getTimeGroup = function*(
   needScrollGutter,
   scrollGutterWidth,
   events,
-  onEventDrop
+  onEventDrop,
+  onEventResize
 ) {
   let _start = start.clone().startOf("day");
   let _end = end.clone().endOf("day");
@@ -133,6 +134,7 @@ const getTimeGroup = function*(
         gutterWidth={gutterWidth}
         slotHeight={slotHeight}
         onEventDrop={onEventDrop}
+        onEventResize={onEventResize}
         index={index++}
       />
     );
@@ -140,7 +142,7 @@ const getTimeGroup = function*(
   } while (_start.isSameOrBefore(_end));
 };
 const TimeGrid = props => {
-  const { range, onEventDrop, events, ...others } = props;
+  const { range, onEventDrop, onEventResize, events, ...others } = props;
   const [needScrollGutter, setNeedScrollGutter] = useState(false);
 
   const timeContentRef = useRef();
@@ -242,7 +244,8 @@ const TimeGrid = props => {
               needScrollGutter,
               scroll_gutter_width,
               events,
-              onEventDrop
+              onEventDrop,
+              onEventResize
             )
           ]}
         </Grid>

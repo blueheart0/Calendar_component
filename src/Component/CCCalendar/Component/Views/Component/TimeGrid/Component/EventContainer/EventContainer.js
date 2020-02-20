@@ -2,6 +2,7 @@ import Grid from "@material-ui/core/Grid";
 import { makeStyles } from "@material-ui/core/styles";
 import clsx from "clsx";
 import moment from "moment";
+import propTypes from "prop-types";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EventItem } from "../EventItem";
 
@@ -41,19 +42,35 @@ const getMaxFriends = (event, maxFriends = 0, visited = []) => {
   }
   return maxFriends;
 };
-const getEvent = function*(events, slotHeight, step, onEventDrop) {
+const getEvent = function*(
+  events,
+  layoutAlgorithm,
+  slotHeight,
+  step,
+  onEventDrop,
+  onEventResize
+) {
+  // console.log(events);
   for (let i = 0; i < events.length; i++) {
     // console.log(events[i].data.title, events[i].friends);
     yield (
       <EventItem
-        key={"Event_" + events[i].data.id + events[i].start.toString()}
+        layoutAlgorithm={layoutAlgorithm}
+        key={"Event_" + events[i].data.id}
         event={events[i]}
         slotHeight={slotHeight}
         step={step}
         index={i}
         id={events[i].data.id}
         onEventDrop={onEventDrop}
-        maxFriends={events[i].friends ? getMaxFriends(events[i]) : 0}
+        onEventResize={onEventResize}
+        maxFriends={
+          events[i].friends
+            ? layoutAlgorithm === "overlap"
+              ? events[i].friends.length
+              : getMaxFriends(events[i])
+            : 0
+        }
       />
     );
   }
@@ -96,9 +113,19 @@ const getFriends = rawEvent => {
   }
   return _temp;
 };
-
+const AllDayHour = 24;
+const OneHourMinutes = 60;
 const EventContainer = props => {
-  const { date, step, slotHeight, events, index, onEventDrop } = props;
+  const {
+    date,
+    step,
+    slotHeight,
+    events,
+    index,
+    layoutAlgorithm,
+    onEventDrop,
+    onEventResize
+  } = props;
   const eventContainerRef = useRef();
   const classes = useStyle();
   const [currentEvent, setCurrentEvent] = useState([]);
@@ -150,45 +177,69 @@ const EventContainer = props => {
         ev.nativeEvent.stopImmediatePropagation();
 
         let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        data = {
-          ...data,
-          start: moment(data.start, "X"),
-          end: moment(data.end, "X")
-        };
-        let _dropStart = _start
-          .clone()
-          .add(
-            24 *
-              60 *
-              ((ev.nativeEvent.offsetY - data.y) /
-                eventContainerRef.current.scrollHeight),
-            "minutes"
-          )
-          .subtract(
-            (24 *
-              60 *
-              ((ev.nativeEvent.offsetY - data.y) /
-                eventContainerRef.current.scrollHeight)) %
-              step,
-            "minutes"
-          );
-        onEventDrop({
-          start: _dropStart,
-          end: _dropStart
-            .clone()
-            .add(moment.duration(data.end.diff(data.start))),
-          resourceId: null,
-          droppedOnAllDaySlot: false,
-          data: data.data
-        });
+        switch (data.type) {
+          default:
+          case "drag":
+            data = {
+              ...data,
+              start: moment(data.start, "X"),
+              end: moment(data.end, "X")
+            };
+            let _dropStart = _start
+              .clone()
+              .add(
+                AllDayHour *
+                  OneHourMinutes *
+                  ((ev.nativeEvent.offsetY - data.y) /
+                    eventContainerRef.current.scrollHeight),
+                "minutes"
+              )
+              .subtract(
+                (AllDayHour *
+                  OneHourMinutes *
+                  ((ev.nativeEvent.offsetY - data.y) /
+                    eventContainerRef.current.scrollHeight)) %
+                  step,
+                "minutes"
+              );
+            onEventDrop &&
+              onEventDrop({
+                start: _dropStart,
+                end: _dropStart
+                  .clone()
+                  .add(moment.duration(data.end.diff(data.start))),
+                resourceId: null,
+                droppedOnAllDaySlot: false,
+                data: data.data
+              });
+            break;
+          case "resize":
+            console.log(data);
+            break;
+        }
       }}
       onDragOver={ev => {
         ev.preventDefault();
         ev.dataTransfer.dropEffect = "move";
       }}
     >
-      {[...getEvent(currentEvent, slotHeight, step, onEventDrop)]}
+      {[
+        ...getEvent(
+          currentEvent,
+          layoutAlgorithm,
+          slotHeight,
+          step,
+          onEventDrop,
+          onEventResize
+        )
+      ]}
     </Grid>
   );
+};
+EventContainer.defaultProps = {
+  layoutAlgorithm: "overlap"
+};
+EventContainer.propTypes = {
+  layoutAlgorithm: propTypes.oneOf(["overlap", "noOverlap"])
 };
 export default EventContainer;

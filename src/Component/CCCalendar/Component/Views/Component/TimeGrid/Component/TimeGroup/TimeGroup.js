@@ -51,6 +51,7 @@ const TimeGroup = props => {
     slotHeight,
     events,
     onEventDrop,
+    onEventResize,
     index
   } = props;
   const timeGroupRef = useRef();
@@ -87,6 +88,7 @@ const TimeGroup = props => {
         step={step}
         index={index}
         onEventDrop={onEventDrop}
+        onEventResize={onEventResize}
       />
     </Grid>
   );
