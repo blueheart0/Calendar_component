@@ -1,8 +1,8 @@
 import Grid from "@material-ui/core/Grid";
 import { makeStyles } from "@material-ui/core/styles";
 import clsx from "clsx";
-import moment from "moment";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useDrag, useDragLayer } from "react-dnd";
 
 const useStyle = makeStyles(
   theme => ({
@@ -72,8 +72,7 @@ const useStyle = makeStyles(
       }
     },
     is__dragging: {
-      // width: 0,
-      // height: 0
+      opacity: 0
     },
     event__item: {
       position: "relative"
@@ -170,12 +169,146 @@ const EventItem = props => {
   const [isResizing, setIsResizing] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const eventItemRef = useRef();
+  const eventUpperHandleRef = useRef();
+  const stepPercent = useMemo(() => {
+    return (step / (AllDayHour * OneHourMinutes)) * 100;
+  }, [step]);
+  const [eventItemHeight, setEventItemHeight] = useState(
+    eventItemRef?.current?.offsetHeight
+  );
   const [eventSize, setEventSize] = useState({
     maxFriends: 0,
     top: 0,
     bottom: 0
   });
-  // console.log(event);
+  const [eventResizeSize, setEventResizeSize] = useState({
+    top: 0,
+    height: 0
+  });
+  // console.log(eventItemRef?.current?.offsetTop);
+  const [collectedProps, dragRef, previewRef] = useDrag({
+    item: {
+      id: id,
+      type: Symbol.for("EventItemDrag"),
+      event: event,
+      eventElHeight: eventItemRef?.current?.offsetHeight
+    },
+    options: {
+      eventEl: eventItemRef
+    },
+    collect: monitor => {
+      return {
+        isDragging: !!monitor.isDragging()
+      };
+    }
+  });
+
+  const [
+    collecteUpperdResizeProps,
+    upperResizeRef,
+    upperResizePreview
+  ] = useDrag({
+    item: {
+      id: id,
+      type: Symbol.for("EventItemResize"),
+      event: event,
+      eventEl: eventUpperHandleRef
+    },
+    collect: monitor => {
+      // console.log(monitor.getDifferenceFromInitialOffset());
+      // if (
+      //   monitor.getItemType() === Symbol.for("EventItemResize") &&
+      //   event.data.id === monitor.getItem().id
+      // ) {
+      //   let yPos = monitor.getDifferenceFromInitialOffset()?.y;
+      //   let screenHeight = ((AllDayHour * OneHourMinutes) / step) * slotHeight;
+      //   return {
+      //     id: monitor.getItem().id,
+      //     needUpperResize: yPos
+      //       ? (Math.abs(yPos) / screenHeight) * 100 >= 1
+      //       : false,
+      //     upperSize: Math.ceil((yPos / screenHeight) * 100)
+      //   };
+      // }
+    },
+    isDragging: monitor => {
+      console.log(isDragging);
+      setIsDragging(true);
+    }
+  });
+  const collectedLayerProps = useDragLayer(monitor => {
+    if (monitor.getItemType() === Symbol.for("EventItemResize")) {
+      let yPos = monitor.getDifferenceFromInitialOffset()?.y;
+      let screenHeight = ((AllDayHour * OneHourMinutes) / step) * slotHeight;
+      return {
+        id: monitor.getItem().id,
+        needUpperResize: yPos
+          ? (Math.abs(yPos) / screenHeight) * 100 >= 1
+          : false,
+        upperSize: Math.ceil((yPos / screenHeight) * 100)
+      };
+    }
+  });
+
+  const needUpperResize = useMemo(() => {
+    // console.log(collectedLayerProps);
+    if (!!collectedLayerProps) {
+      return {
+        id: collectedLayerProps.id,
+        need: !!collectedLayerProps?.needUpperResize,
+        upperSize: collectedLayerProps?.upperSize
+          ? collectedLayerProps.upperSize
+          : 0
+      };
+    } else {
+      return {
+        id: null,
+        need: false,
+        upperSize: 0
+      };
+    }
+  }, [collectedLayerProps]);
+  useEffect(() => {
+    // console.log(collectedLayerProps);
+    if (needUpperResize.need && needUpperResize?.id === event.data.id) {
+      // console.log("needUpperResize", needUpperResize);
+      let _resizeStart =
+        needUpperResize.upperSize > 0
+          ? event.start
+              .clone()
+              .subtract(
+                AllDayHour *
+                  OneHourMinutes *
+                  (stepPercent / 100) *
+                  needUpperResize.upperSize,
+                "minutes"
+              )
+          : event.start
+              .clone()
+              .add(
+                AllDayHour *
+                  OneHourMinutes *
+                  (stepPercent / 100) *
+                  needUpperResize.upperSize,
+                "minutes"
+              );
+      let _resizeStartMinutes =
+        _resizeStart.hours() * OneHourMinutes + _resizeStart.minutes();
+      let bottomMinutes =
+        event.end.hour() * OneHourMinutes + event.end.minute();
+      setEventResizeSize({
+        maxFriends: 0,
+        friends: 0,
+        top: (_resizeStartMinutes / (AllDayHour * OneHourMinutes)) * 100,
+        height:
+          (bottomMinutes / (AllDayHour * OneHourMinutes) -
+            _resizeStartMinutes / (AllDayHour * OneHourMinutes)) *
+          100,
+        friendsIndex: 0,
+        step: step
+      });
+    }
+  }, [needUpperResize]);
   useEffect(() => {
     if (event && event?.start && event?.end && step && slotHeight) {
       // console.log("MaxFriends", getMaxFriends(event));
@@ -191,25 +324,29 @@ const EventItem = props => {
           (bottomMinutes / (AllDayHour * OneHourMinutes) -
             topMinutes / (AllDayHour * OneHourMinutes)) *
           100,
-        friendsIndex: event.friendsIndex ? event.friendsIndex : 0
+        friendsIndex: event.friendsIndex ? event.friendsIndex : 0,
+        step: step
+      });
+      setEventResizeSize({
+        top: (topMinutes / (AllDayHour * OneHourMinutes)) * 100,
+        height:
+          (bottomMinutes / (AllDayHour * OneHourMinutes) -
+            topMinutes / (AllDayHour * OneHourMinutes)) *
+          100
       });
     } else {
       setEventSize({ maxFriends: 0, top: 0, bottom: 0 });
+      setEventResizeSize({
+        top: 0,
+        bottom: 0
+      });
     }
   }, [event, slotHeight, step, maxFriends]);
   const [backgroundColor, setBackgroundColor] = useState(
     // () => "#" + Math.floor(Math.random() * 16777215).toString(16)
     "#ffffff"
   );
-  useEffect(() => {
-    if (eventItemRef.current) {
-      // console.log(eventItemRef);
-      eventItemRef.current.hidden = isDragging;
-    }
-  }, [isDragging]);
-  useEffect(() => {
-    setIsInteracting(false);
-  }, [eventSize]);
+
   const classes = useStyle({
     ...eventSize,
     step: step,
@@ -217,357 +354,120 @@ const EventItem = props => {
     backgroundColor: backgroundColor,
     layoutAlgorithm: layoutAlgorithm
   });
-  // console.log(event.data.id, event.start.toString());
-  const handleUpperResize = event => {
-    let heightDiff = event.layerY;
-    // if (heightDiff > 0) {
-    //   return true;
-    // }
-    let stepPercent = (step / (AllDayHour * OneHourMinutes)) * 100;
-    // console.table({
-    //   a: heightDiff > 0,
-    //   b: eventSize.height <= step,
-    //   "eventSize.height": eventSize.height,
-    //   step: step,
-    //   stepPercent: stepPercent,
-    //   filter: heightDiff > 0 && eventSize.height <= step
-    // });
-    if (heightDiff > 0 && eventSize.height <= stepPercent) {
-      return true;
-    }
-    let upperHeightDiff =
-      (step / (AllDayHour * OneHourMinutes)) *
-      eventItemRef.current.offsetParent.scrollHeight;
-    let needExpand = Math.abs(heightDiff) > upperHeightDiff;
 
-    if (needExpand && eventItemRef.current && !isInteracting) {
-      setIsInteracting(true);
-      // console.log(eventItemRef);
-      // console.table({
-      //   heightDiff: heightDiff,
-      //   upperHeightDiff: upperHeightDiff,
-      //   needExpand: needExpand,
-      //   "eventSize.height": eventSize.height,
-      //   result:
-      //     eventSize.height +
-      //     (upperHeightDiff / eventItemRef.current.offsetParent.scrollHeight) *
-      //       100
-      // });
-      // console.table([]);
-
-      setEventSize({
-        ...eventSize,
-        top:
-          heightDiff > 0
-            ? eventSize.top +
-              (upperHeightDiff /
-                eventItemRef.current.offsetParent.scrollHeight) *
-                100
-            : eventSize.top -
-              (upperHeightDiff /
-                eventItemRef.current.offsetParent.scrollHeight) *
-                100,
-        height:
-          heightDiff > 0
-            ? eventSize.height -
-              (upperHeightDiff /
-                eventItemRef.current.offsetParent.scrollHeight) *
-                100
-            : eventSize.height +
-              (upperHeightDiff /
-                eventItemRef.current.offsetParent.scrollHeight) *
-                100
-      });
-    }
-  };
-
-  const handleLowerResize = event => {
-    let heightDiff = event.layerY;
-    let stepPercent = (step / (AllDayHour * OneHourMinutes)) * 100;
-    // if (heightDiff < 0) {
-    //   return true;
-    // }
-    if (heightDiff < 0 && eventSize.height <= stepPercent) {
-      return true;
-    }
-    let upperHeightDiff =
-      (step / (AllDayHour * OneHourMinutes)) *
-      eventItemRef.current.offsetParent.scrollHeight;
-    let needExpand = Math.abs(heightDiff) > upperHeightDiff;
-
-    if (needExpand && eventItemRef.current && !isInteracting) {
-      setIsInteracting(true);
-      // console.log(eventItemRef);
-      // console.table({
-      //   heightDiff: heightDiff,
-      //   upperHeightDiff: upperHeightDiff,
-      //   needExpand: needExpand,
-      //   "eventSize.height": eventSize.height,
-      //   result:
-      //     eventSize.height +
-      //     (upperHeightDiff / eventItemRef.current.offsetParent.scrollHeight) *
-      //       100
-      // });
-      // console.table([]);
-
-      setEventSize({
-        ...eventSize,
-        // top:
-        //   eventSize.top +
-        //   (upperHeightDiff / eventItemRef.current.offsetParent.scrollHeight) *
-        //     100,
-        height:
-          heightDiff < 0
-            ? eventSize.height -
-              (upperHeightDiff /
-                eventItemRef.current.offsetParent.scrollHeight) *
-                100
-            : eventSize.height +
-              (upperHeightDiff /
-                eventItemRef.current.offsetParent.scrollHeight) *
-                100
-      });
-    }
-  };
-
-  // console.log("eventSize", eventSize);
   return (
-    <Grid
-      item
-      container
-      id={id}
-      draggable={!isResizing}
-      ref={eventItemRef}
-      data-start={event.start.toString()}
-      data-end={event.end.toString()}
-      onDrop={ev => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        ev.nativeEvent.stopImmediatePropagation();
-
-        let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        switch (data.type) {
-          default:
-          case "drag":
-            data = {
-              ...data,
-              start: moment(data.start, "X"),
-              end: moment(data.end, "X")
-            };
-            let _dropStart = event.start
-              .clone()
-              .startOf("day")
-              .add(
-                AllDayHour *
-                  OneHourMinutes *
-                  ((ev.currentTarget.offsetTop +
-                    ev.nativeEvent.offsetY -
-                    data.y) /
-                    ev.currentTarget.offsetParent.scrollHeight),
-                "minutes"
-              )
-              .subtract(
-                (AllDayHour *
-                  OneHourMinutes *
-                  ((ev.currentTarget.offsetTop +
-                    ev.nativeEvent.offsetY -
-                    data.y) /
-                    ev.currentTarget.offsetParent.scrollHeight)) %
-                  step,
-                "minutes"
-              );
-            onEventDrop &&
-              onEventDrop({
-                start: _dropStart,
-                end: _dropStart
-                  .clone()
-                  .add(moment.duration(data.end.diff(data.start))),
-                resourceId: null,
-                droppedOnAllDaySlot: false,
-                data: data.data
-              });
-            setIsDragging(false);
-            break;
-          case "resize":
-            break;
-        }
-      }}
-      onDragStart={ev => {
-        console.log("DragStart", ev);
-        ev.stopPropagation();
-        ev.nativeEvent.stopImmediatePropagation();
-        ev.dataTransfer.dropEffect = "move";
-        ev.dataTransfer.effectAllowed = "move";
-        ev.dataTransfer.setDragImage(
-          eventItemRef.current,
-          ev.nativeEvent.offsetX,
-          ev.nativeEvent.offsetY
-        ); //TODO:Element를 지정할수 있어서 데이터로 따로 엘리먼트 만들어 넣으면 된다, ref를 넣어야 함
-        console.log("onDragStart", event);
-        delete event.friends;
-        ev.dataTransfer.setData(
-          "text/plain",
-          JSON.stringify({
-            ...event,
-            start: event.start.unix(),
-            end: event.end.unix(),
-            x: ev.nativeEvent.offsetX,
-            y: ev.nativeEvent.offsetY,
-            type: "drag"
-          })
-        );
-        setIsDragging(true);
-      }}
-      className={clsx(classes.root, { [classes.is__dragging]: isDragging })}
-      onDragOver={ev => {
-        ev.preventDefault();
-        ev.dataTransfer.dropEffect = "move";
-      }}
-      onDragEnd={e => {
-        e.preventDefault();
-        // console.log("onDragEnd", e);
-        setIsDragging(false);
-      }}
-    >
-      <Grid className={clsx(classes.event__item)} item container>
-        <Grid
-          draggable={true}
-          onDragStart={ev => {
-            ev.stopPropagation();
-            ev.nativeEvent.stopImmediatePropagation();
-            setIsResizing(true);
-            console.log("onDragStart-Resize", ev);
-            delete event.friends;
-            ev.dataTransfer.setDragImage(
-              document.createElement("div"),
-              ev.nativeEvent.offsetX,
-              ev.nativeEvent.offsetY
-            );
-            ev.dataTransfer.setData(
-              "text/plain",
-              JSON.stringify({
-                ...event,
-                start: event.start.unix(),
-                end: event.end.unix(),
-                x: ev.nativeEvent.offsetX,
-                y: ev.nativeEvent.offsetY,
-                type: "resize"
-              })
-            );
-          }}
-          onDrag={ev => {
-            ev.persist();
-            ev.stopPropagation();
-            ev.nativeEvent.stopImmediatePropagation();
-            ev.preventDefault();
-            ev.dataTransfer.dropEffect = "move";
-            throttle(handleUpperResize(ev.nativeEvent), 400);
-          }}
-          onDragEnd={ev => {
-            setIsResizing(false);
-            // console.log(ev);
-            // console.log(ev.type);
-            // // let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
-            // console.log(ev.dataTransfer.getData("text/plain"));
-            let _start = event.start
-              .clone()
-              .startOf("day")
-              .add(
-                (eventSize.top / 100) * (AllDayHour * OneHourMinutes),
-                "minutes"
-              );
-            let _end = _start
-              .clone()
-              .add(
-                (eventSize.height / 100) * (AllDayHour * OneHourMinutes),
-                "minutes"
-              );
-            onEventResize &&
-              onEventResize({
-                start: _start,
-                end: _end,
-                event: {
-                  start: _start,
-                  end: _end,
-                  data: event.data
-                }
-              });
-          }}
-          item
-          className={clsx(classes.resize__handle, classes.resize__handle__top)}
-        >
-          Handle
-        </Grid>
+    <>
+      <div className={clsx(classes.root)} ref={previewRef}>
         {event.data.title}
-        <Grid
-          item
-          className={clsx(
-            classes.resize__handle,
-            classes.resize__handle__bottom
-          )}
-          draggable={true}
-          onDragStart={ev => {
-            ev.stopPropagation();
-            ev.nativeEvent.stopImmediatePropagation();
-            setIsResizing(true);
-            console.log("onDragStart-Resize", ev);
-            delete event.friends;
-            ev.dataTransfer.setDragImage(
-              document.createElement("div"),
-              ev.nativeEvent.offsetX,
-              ev.nativeEvent.offsetY
-            );
-            ev.dataTransfer.setData(
-              "text/plain",
-              JSON.stringify({
-                ...event,
-                start: event.start.unix(),
-                end: event.end.unix(),
-                x: ev.nativeEvent.offsetX,
-                y: ev.nativeEvent.offsetY,
-                type: "resize"
-              })
-            );
-          }}
-          onDrag={ev => {
-            ev.persist();
-            ev.stopPropagation();
-            ev.nativeEvent.stopImmediatePropagation();
-            ev.preventDefault();
-            ev.dataTransfer.dropEffect = "move";
-            throttle(handleLowerResize(ev.nativeEvent), 500);
-          }}
-          onDragEnd={ev => {
-            setIsResizing(false);
-            let _start = event.start
-              .clone()
-              .startOf("day")
-              .add(
-                (eventSize.top / 100) * (AllDayHour * OneHourMinutes),
-                "minutes"
-              );
-            let _end = _start
-              .clone()
-              .add(
-                (eventSize.height / 100) * (AllDayHour * OneHourMinutes),
-                "minutes"
-              );
-            onEventResize &&
-              onEventResize({
-                start: _start,
-                end: _end,
-                event: {
-                  start: _start,
-                  end: _end,
-                  data: event.data
-                }
-              });
-          }}
-        >
-          Handle
+      </div>
+      <div
+        className={clsx(classes.root)}
+        ref={upperResizePreview}
+        style={{
+          top: `${eventResizeSize.top}%`,
+          height: `${eventResizeSize.height}%`
+        }}
+      >
+        {event.data.title}
+      </div>
+      <Grid
+        item
+        container
+        id={id}
+        ref={ref => {
+          eventItemRef.current = ref;
+          dragRef(ref);
+        }}
+        data-start={event.start.toString()}
+        data-end={event.end.toString()}
+        className={clsx(classes.root, { [classes.is__dragging]: isDragging })}
+      >
+        <Grid className={clsx(classes.event__item)} item container>
+          <Grid
+            ref={ref => {
+              eventUpperHandleRef.current = ref;
+              upperResizeRef(ref);
+            }}
+            id={"DragUpperHandle_" + id}
+            item
+            className={clsx(
+              classes.resize__handle,
+              classes.resize__handle__top
+            )}
+          >
+            Handle
+          </Grid>
+          {event.data.title}
+          {/*<Grid*/}
+          {/*  item*/}
+          {/*  className={clsx(*/}
+          {/*    classes.resize__handle,*/}
+          {/*    classes.resize__handle__bottom*/}
+          {/*  )}*/}
+          {/*  draggable={true}*/}
+          {/*  onDragStart={ev => {*/}
+          {/*    ev.stopPropagation();*/}
+          {/*    ev.nativeEvent.stopImmediatePropagation();*/}
+          {/*    setIsResizing(true);*/}
+          {/*    console.log("onDragStart-Resize", ev);*/}
+          {/*    delete event.friends;*/}
+          {/*    ev.dataTransfer.setDragImage(*/}
+          {/*      document.createElement("div"),*/}
+          {/*      ev.nativeEvent.offsetX,*/}
+          {/*      ev.nativeEvent.offsetY*/}
+          {/*    );*/}
+          {/*    ev.dataTransfer.setData(*/}
+          {/*      "text/plain",*/}
+          {/*      JSON.stringify({*/}
+          {/*        ...event,*/}
+          {/*        start: event.start.unix(),*/}
+          {/*        end: event.end.unix(),*/}
+          {/*        x: ev.nativeEvent.offsetX,*/}
+          {/*        y: ev.nativeEvent.offsetY,*/}
+          {/*        type: "resize"*/}
+          {/*      })*/}
+          {/*    );*/}
+          {/*  }}*/}
+          {/*  onDrag={ev => {*/}
+          {/*    ev.persist();*/}
+          {/*    ev.stopPropagation();*/}
+          {/*    ev.nativeEvent.stopImmediatePropagation();*/}
+          {/*    ev.preventDefault();*/}
+          {/*    ev.dataTransfer.dropEffect = "move";*/}
+          {/*    throttle(handleLowerResize(ev.nativeEvent), 500);*/}
+          {/*  }}*/}
+          {/*  onDragEnd={ev => {*/}
+          {/*    setIsResizing(false);*/}
+          {/*    let _start = event.start*/}
+          {/*      .clone()*/}
+          {/*      .startOf("day")*/}
+          {/*      .add(*/}
+          {/*        (eventSize.top / 100) * (AllDayHour * OneHourMinutes),*/}
+          {/*        "minutes"*/}
+          {/*      );*/}
+          {/*    let _end = _start*/}
+          {/*      .clone()*/}
+          {/*      .add(*/}
+          {/*        (eventSize.height / 100) * (AllDayHour * OneHourMinutes),*/}
+          {/*        "minutes"*/}
+          {/*      );*/}
+          {/*    onEventResize &&*/}
+          {/*      onEventResize({*/}
+          {/*        start: _start,*/}
+          {/*        end: _end,*/}
+          {/*        event: {*/}
+          {/*          start: _start,*/}
+          {/*          end: _end,*/}
+          {/*          data: event.data*/}
+          {/*        }*/}
+          {/*      });*/}
+          {/*  }}*/}
+          {/*>*/}
+          {/*  Handle*/}
+          {/*</Grid>*/}
         </Grid>
       </Grid>
-    </Grid>
+    </>
   );
 };
 export default EventItem;

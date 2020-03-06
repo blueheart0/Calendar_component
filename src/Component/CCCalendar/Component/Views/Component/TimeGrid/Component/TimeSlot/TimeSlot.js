@@ -2,7 +2,7 @@ import Grid from "@material-ui/core/Grid";
 import { makeStyles } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
 import clsx from "clsx";
-import React, { useState } from "react";
+import React from "react";
 
 const useStyle = makeStyles(
   theme => ({
@@ -37,10 +37,9 @@ const TimeSlot = props => {
     gutterWidth: gutterWidth,
     slotHeight: slotHeight
   });
-  const [isHover, setIsHover] = useState(false);
 
   return (
-    <Grid className={clsx(classes.root, { [classes.is__hover]: isHover })} item>
+    <Grid className={clsx(classes.root)} item>
       <Typography className={clsx(classes.debugTypo)}>
         {start.format("HH:mm") + " - " + end.format("HH:mm")}
       </Typography>

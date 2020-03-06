@@ -3,6 +3,8 @@ import { makeStyles } from "@material-ui/core/styles";
 import clsx from "clsx";
 import moment from "moment";
 import React, { useEffect, useRef, useState } from "react";
+import { DndProvider } from "react-dnd";
+import Backend from "react-dnd-html5-backend";
 import { TimeGroup, TimeGutter, WeekHeader } from "./Component";
 
 const gutter_width = 90;
@@ -178,79 +180,83 @@ const TimeGrid = props => {
 
   // console.log(onEventDrop);
   return (
-    <Box className={clsx(classes.root)}>
-      <Grid container direction={"column"} style={{ height: "inherit" }}>
-        <Grid
-          className={clsx(classes.header)}
-          item
-          container
-          direction={"row"}
-          wrap={"nowrap"}
-        >
-          <Grid item className={classes.gutter__header} />
+    <DndProvider backend={Backend}>
+      <Box className={clsx(classes.root)}>
+        <Grid container direction={"column"} style={{ height: "inherit" }}>
+          <Grid
+            className={clsx(classes.header)}
+            item
+            container
+            direction={"row"}
+            wrap={"nowrap"}
+          >
+            <Grid item className={classes.gutter__header} />
+            <Grid
+              item
+              container
+              style={{
+                width: `calc(100% - ${props.gutterWidth}px - ${
+                  props.needScrollGutter ? props.scrollGutterWidth : 0
+                }px) `
+              }}
+              direction={"column"}
+            >
+              <Grid item container>
+                {[
+                  ...getWeekHeader(
+                    range,
+                    header_height,
+                    needScrollGutter,
+                    scroll_gutter_width
+                  )
+                ]}
+              </Grid>
+              <Grid item container ref={headerRef}>
+                {[
+                  ...getAllDaySlot(
+                    range,
+                    header_height,
+                    needScrollGutter,
+                    scroll_gutter_width
+                  )
+                ]}
+              </Grid>
+            </Grid>
+            {needScrollGutter && (
+              <Grid item className={classes.scroll__gutter} />
+            )}
+          </Grid>
           <Grid
             item
             container
-            style={{
-              width: `calc(100% - ${props.gutterWidth}px - ${
-                props.needScrollGutter ? props.scrollGutterWidth : 0
-              }px) `
-            }}
-            direction={"column"}
+            className={clsx(classes.time_content)}
+            ref={timeContentRef}
           >
-            <Grid item container>
-              {[
-                ...getWeekHeader(
-                  range,
-                  header_height,
-                  needScrollGutter,
-                  scroll_gutter_width
-                )
-              ]}
+            <Grid
+              item
+              container
+              direction={"column"}
+              className={clsx(classes.gutter__group)}
+            >
+              {[...getTimeGutter(15, slot_height)]}
             </Grid>
-            <Grid item container ref={headerRef}>
-              {[
-                ...getAllDaySlot(
-                  range,
-                  header_height,
-                  needScrollGutter,
-                  scroll_gutter_width
-                )
-              ]}
-            </Grid>
+            {[
+              ...getTimeGroup(
+                range,
+                15,
+                gutter_width,
+                slot_height,
+                needScrollGutter,
+                scroll_gutter_width,
+                events,
+                onEventDrop,
+                onEventResize
+              )
+            ]}
           </Grid>
-          {needScrollGutter && <Grid item className={classes.scroll__gutter} />}
         </Grid>
-        <Grid
-          item
-          container
-          className={clsx(classes.time_content)}
-          ref={timeContentRef}
-        >
-          <Grid
-            item
-            container
-            direction={"column"}
-            className={clsx(classes.gutter__group)}
-          >
-            {[...getTimeGutter(15, slot_height)]}
-          </Grid>
-          {[
-            ...getTimeGroup(
-              range,
-              15,
-              gutter_width,
-              slot_height,
-              needScrollGutter,
-              scroll_gutter_width,
-              events,
-              onEventDrop,
-              onEventResize
-            )
-          ]}
-        </Grid>
-      </Grid>
-    </Box>
+      </Box>
+    </DndProvider>
   );
 };
 export default TimeGrid;

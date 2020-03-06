@@ -2,8 +2,9 @@ import moment from "moment";
 import React, { useState } from "react";
 import { CCCalendar } from "./Component/CCCalendar";
 
+const DummyCount = 10;
 const makeData = function*() {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < DummyCount; i++) {
     let current = moment().add(24 * Math.random(), "hour");
     // let current = moment().add(i, "hour");
     yield {

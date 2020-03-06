@@ -4,6 +4,7 @@ import clsx from "clsx";
 import moment from "moment";
 import propTypes from "prop-types";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useDragLayer, useDrop } from "react-dnd";
 import { EventItem } from "../EventItem";
 
 const useStyle = makeStyles(
@@ -128,6 +129,114 @@ const EventContainer = props => {
     onEventResize
   } = props;
   const eventContainerRef = useRef();
+  const stepPercent = useMemo(() => {
+    return (step / (AllDayHour * OneHourMinutes)) * 100;
+  }, [step]);
+  const collectedLayerProps = useDragLayer(monitor => {
+    if (monitor.getItemType() === Symbol.for("EventItemResize")) {
+      let yPos = monitor.getDifferenceFromInitialOffset()?.y;
+      let screenHeight = ((AllDayHour * OneHourMinutes) / step) * slotHeight;
+      return {
+        id: monitor.getItem().id,
+        needUpperResize: yPos
+          ? (Math.abs(yPos) / screenHeight) * 100 >= 1
+          : false,
+        upperSize: Math.ceil((yPos / screenHeight) * 100)
+      };
+    }
+  });
+  const [collectedResizeProps, resizeRef] = useDrop({
+    accept: Symbol.for("EventItemResize"),
+    drop: (item, monitor) => {
+      console.log("resize", item);
+      console.log("resize", collectedLayerProps);
+      let _event = item.event;
+      if (collectedLayerProps.needUpperResize) {
+        let _resizeStart = _event.start
+          .clone()
+          .add(
+            AllDayHour *
+              OneHourMinutes *
+              (stepPercent / 100) *
+              collectedLayerProps.upperSize,
+            "minutes"
+          );
+        console.log(_resizeStart.toString());
+        delete _event.friends;
+        onEventDrop({
+          ..._event,
+          start: _resizeStart
+        });
+      }
+    },
+    hover: (item, monitor) => {
+      // console.log("resize - hover", monitor.getDifferenceFromInitialOffset());
+      return monitor.getDifferenceFromInitialOffset();
+    }
+  });
+
+  const [collectedProps, dropRef] = useDrop({
+    accept: Symbol.for("EventItemDrag"),
+    collect: (monitor, props) => {},
+    drop: (item, monitor) => {
+      switch (item.type) {
+        default:
+        case Symbol.for("EventItemDrag"):
+          let data = {
+            ...item.event
+          };
+          let _height =
+            (moment.duration(data.end.diff(data.start)).minutes() /
+              (AllDayHour * OneHourMinutes)) *
+            eventContainerRef.current.scrollHeight;
+          let _top =
+            (eventContainerRef.current.scrollHeight *
+              (data.start.hour() * OneHourMinutes + data.start.minute())) /
+            (AllDayHour * OneHourMinutes);
+          let offsetY = Math.max(
+            _top + monitor.getDifferenceFromInitialOffset().y,
+            0
+          );
+          let _dropStart = date
+            .clone()
+            .startOf("day")
+            .add(
+              Math.max(
+                AllDayHour *
+                  OneHourMinutes *
+                  ((offsetY + _height / 2) /
+                    eventContainerRef.current.scrollHeight),
+                0
+              ),
+              "minutes"
+            )
+            .subtract(
+              (AllDayHour *
+                OneHourMinutes *
+                ((offsetY + _height / 2) /
+                  eventContainerRef.current.scrollHeight)) %
+                step,
+              "minutes"
+            );
+
+          console.log(_dropStart);
+          onEventDrop &&
+            onEventDrop({
+              start: _dropStart,
+              end: _dropStart
+                .clone()
+                .add(moment.duration(data.end.diff(data.start))),
+              resourceId: null,
+              droppedOnAllDaySlot: false,
+              data: data.data
+            });
+          break;
+        case "resize":
+          console.log(data);
+          break;
+      }
+    }
+  });
   const classes = useStyle();
   const [currentEvent, setCurrentEvent] = useState([]);
   const rawEvent = useMemo(() => {
@@ -163,66 +272,21 @@ const EventContainer = props => {
       setCurrentEvent([]);
     }
   }, [rawEvent]);
-  const _start = useMemo(() => date.clone().startOf("day"), [date]);
-  // if (currentEvent.length > 0) console.log(currentEvent);
 
   return (
     <Grid
-      ref={eventContainerRef}
+      ref={ref => {
+        eventContainerRef.current = ref;
+        dropRef(ref);
+        resizeRef(ref);
+      }}
       item
       container
       className={clsx(classes.root)}
-      onDrop={ev => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        ev.nativeEvent.stopImmediatePropagation();
-
-        let data = JSON.parse(ev.dataTransfer.getData("text/plain"));
-        switch (data.type) {
-          default:
-          case "drag":
-            data = {
-              ...data,
-              start: moment(data.start, "X"),
-              end: moment(data.end, "X")
-            };
-            let _dropStart = _start
-              .clone()
-              .add(
-                AllDayHour *
-                  OneHourMinutes *
-                  ((ev.nativeEvent.offsetY - data.y) /
-                    eventContainerRef.current.scrollHeight),
-                "minutes"
-              )
-              .subtract(
-                (AllDayHour *
-                  OneHourMinutes *
-                  ((ev.nativeEvent.offsetY - data.y) /
-                    eventContainerRef.current.scrollHeight)) %
-                  step,
-                "minutes"
-              );
-            onEventDrop &&
-              onEventDrop({
-                start: _dropStart,
-                end: _dropStart
-                  .clone()
-                  .add(moment.duration(data.end.diff(data.start))),
-                resourceId: null,
-                droppedOnAllDaySlot: false,
-                data: data.data
-              });
-            break;
-          case "resize":
-            console.log(data);
-            break;
-        }
-      }}
-      onDragOver={ev => {
-        ev.preventDefault();
-        ev.dataTransfer.dropEffect = "move";
-      }}
+      // onDragOver={ev => {
+      //   ev.preventDefault();
+      //   ev.dataTransfer.dropEffect = "move";
+      // }}
     >
       {[
         ...getEvent(
